@@ -1,0 +1,59 @@
+---
+title: "Map"
+---
+
+```{r}
+#| message: false
+library(tidyverse)
+library(maps)
+library(sf)
+library(rnaturalearth)
+```
+
+```{r}
+#| cache: true
+attacks <- read_csv("data/attacks_clean.csv") |>
+  mutate(
+    Country_lower = str_to_lower(str_trim(Country)),
+    Fatal_clean = case_when(
+      Fatal == "Y" ~ "Fatal",
+      Fatal == "N" ~ "Non-fatal",
+      TRUE ~ "Unknown"
+    )
+  )
+write_rds(attacks, "data/attacks.rds")
+```
+
+```{r}
+#| label: shark-attacks-world-map
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+attack_counts <- attacks |>
+  count(Country_lower, name = "total_attacks")
+
+world_attacks <- world |>
+  mutate(Country_lower = str_to_lower(admin)) |>
+  left_join(attack_counts, by = "Country_lower") |>
+  mutate(total_attacks = coalesce(total_attacks, 0L))
+
+ggplot(world_attacks) +
+  geom_sf(aes(fill = total_attacks), color = "white", linewidth = 0.1) +
+  scale_fill_viridis_c(
+    option = "plasma",
+    trans = "sqrt",
+    name = "Shark Attacks"
+  ) +
+  labs(
+    title = "Shark Attacks Around the World",
+    subtitle = "Total recorded shark attacks by country",
+    caption = "Source: Global Shark Attack Dataset"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+attacks |>
+  filter(Fatal %in% c("Y", "N")) |>
+  mutate(Fatal = recode(Fatal, "Y" = "Fatal", "N" = "Non-fatal")) |>
+  count(Fatal)
+```
